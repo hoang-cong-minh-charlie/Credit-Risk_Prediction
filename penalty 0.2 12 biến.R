@@ -141,47 +141,47 @@ for (i in 1:n_runs) {
   # ==========================
   # GAM (bam)
   # ==========================
-vars_gam <- c("LST","AGE","API","BEL","LAM","LIR","LPI","BCH","PHO","LIN","LGR","PBD")
+vars_gam <- c("lst","age","API","bel","lam","lir","lpi","bch","pho","lin","lgr","pbd")
 
 train_gam <- data_train %>%
   select(all_of(vars_gam)) %>%
   mutate(
-    AGE = as.numeric(AGE),
+    age = as.numeric(age),
     API = as.numeric(API),
-    BEL = as.numeric(BEL),
-    LAM = as.numeric(LAM),
-    LIR = as.numeric(LIR),
-    LPI = as.numeric(LPI),
-    BCH = as.numeric(BCH),
-    PHO = factor(PHO),
-    LIN = factor(LIN),
-    LGR = factor(LGR),
-    PBD = factor(PBD),
-    LST_num = as.numeric(as.character(LST))
+    bel = as.numeric(bel),
+    lam = as.numeric(lam),
+    lir = as.numeric(lir),
+    lpi = as.numeric(lpi),
+    bch = as.numeric(bch),
+    pho = factor(pho),
+    lin = factor(lin),
+    lgr = factor(lgr),
+    pbd = factor(pbd),
+    lst_num = as.numeric(as.character(lst))
   ) %>% droplevels()
 
 test_gam <- data_test %>%
   select(all_of(vars_gam)) %>%
   mutate(
-    AGE = as.numeric(AGE),
+    age = as.numeric(age),
     API = as.numeric(API),
-    BEL = as.numeric(BEL),
-    LAM = as.numeric(LAM),
-    LIR = as.numeric(LIR),
-    LPI = as.numeric(LPI),
-    BCH = as.numeric(BCH),
-    PHO = factor(PHO, levels = levels(train_gam$PHO)),
-    LIN = factor(LIN, levels = levels(train_gam$LIN)),
-    LGR = factor(LGR, levels = levels(train_gam$LGR)),
-    PBD = factor(PBD, levels = levels(train_gam$PBD)),
-    LST_num = as.numeric(as.character(LST))
+    bel = as.numeric(bel),
+    lam = as.numeric(lam),
+    lir = as.numeric(lir),
+    lpi = as.numeric(lpi),
+    bch = as.numeric(bch),
+    pho = factor(pho, levels = levels(train_gam$pho)),
+    lin = factor(lin, levels = levels(train_gam$lin)),
+    lgr = factor(lgr, levels = levels(train_gam$lgr)),
+    pbd = factor(pbd, levels = levels(train_gam$pbd)),
+    lst_num = as.numeric(as.character(lst))
   ) %>% droplevels()
 
 
 bam_model <- bam(
-  LST_num ~ s(AGE, k=10) + s(API, k=10) + s(BEL, k=10) + s(LAM, k=10) +
-            s(LIR, k=10) + s(LPI, k=10) + s(BCH, k=10) +
-            PHO + LIN + LGR + PBD,
+  lst_num ~ s(age, k=10) + s(API, k=10) + s(bel, k=10) + s(lam, k=10) +
+            s(lir, k=10) + s(lpi, k=10) + s(bch, k=10) +
+            pho + lin + lgr + pbd,
   data = train_gam,
   family = binomial(),
   method = "fREML",
@@ -192,7 +192,7 @@ gam_prob_vec <- as.numeric(predict(bam_model, newdata = test_gam, type = "respon
 gam_pred_class_vec <- factor(ifelse(gam_prob_vec >= 0.5, "1", "0"), levels = c("0","1"))
 
 gam_eval <- tibble(
-  lst = data_test$LST,
+  lst = data_test$lst,
   .pred_class = gam_pred_class_vec,
   .pred_1 = gam_prob_vec
 )
