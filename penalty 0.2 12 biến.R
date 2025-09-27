@@ -41,7 +41,7 @@ data_clean <- data %>%
     age >= 18, age <= 100,
     bel >= 0, bel <= age - 18,
     bch <= age - 18,
-     > 0,  <= 150000
+    api > 0, api <= 150000
   ) %>%
   mutate(.row = row_number())
 
