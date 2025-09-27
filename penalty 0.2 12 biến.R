@@ -196,3 +196,94 @@ gam_eval <- tibble(
   .pred_class = gam_pred_class_vec,
   .pred_1 = gam_prob_vec
 )
+ # ==========================
+  # STACKING (glmnet, ưu tiên GAM)
+  # ==========================
+  xgb_train_prob_vec <- predict(xgb_final, new_data = data_train, type = "prob")$.pred_1
+  gam_train_prob_vec <- as.numeric(predict(bam_model, newdata = train_gam, type = "response"))
+  
+  X_train <- cbind(xgb = xgb_train_prob_vec, gam = gam_train_prob_vec)
+  X_test  <- cbind(xgb = xgb_prob_vec, gam = gam_prob_vec)
+  y_train <- ifelse(as.character(data_train$lst) == "1", 1, 0)
+  
+  cvfit <- cv.glmnet(
+    x = X_train,
+    y = y_train,
+    family = "binomial",
+    alpha = 0,  # ridge
+    penalty.factor = c(1, 0.2),  # ✅ XGB = 1, GAM = 0.2
+    standardize = TRUE,
+    nfolds = 5
+  )
+  
+  stacking_prob_vec <- as.numeric(predict(cvfit, newx = X_test, s = "lambda.min", type = "response"))
+  stacking_pred_class_vec <- factor(ifelse(stacking_prob_vec > 0.5, "1", "0"), levels = c("0", "1"))
+  
+  stacking_eval <- tibble(lst = data_test$lst,
+                          .pred_class = stacking_pred_class_vec,
+                          .pred_1 = stacking_prob_vec)
+  
+  # ==========================
+  # ✅ FIX: tidy coef glmnet (không lỗi zero-length name)
+  # ==========================
+  coef_mat <- coef(cvfit, s = "lambda.min") %>% as.matrix()
+  coef_df <- as.data.frame(coef_mat) %>%
+    tibble::rownames_to_column("term") %>%
+    rename(estimate = 2) %>%
+    mutate(term = ifelse(term == "", "(Intercept)", term),
+           Iter = i)
+  
+  meta_weights[[i]] <- coef_df
+  
+  # ==========================
+  # Metrics
+  # ==========================
+  xgb_metrics <- calc_metrics(xgb_eval, "XGBoost")
+  gam_metrics <- calc_metrics(gam_eval, "GAM (bam)")
+  stk_metrics <- calc_metrics(stacking_eval, "Stacking")
+  
+  all_metrics[[i]] <- bind_rows(
+    mutate(xgb_metrics, Iter = i),
+    mutate(gam_metrics, Iter = i),
+    mutate(stk_metrics, Iter = i)
+  )
+}
+
+# Gộp kết quả
+metrics_runs <- bind_rows(all_metrics)
+weights_runs <- bind_rows(meta_weights)
+
+# ==========================
+# 5. T-TEST COMPARISON (6 metrics)
+# ==========================
+metric_names <- c("Accuracy","Precision","Recall","F1","AUC","Brier")
+t_results <- list()
+
+for (m in metric_names) {
+  for (pair in list(c("XGBoost","Stacking"), c("GAM (bam)","Stacking"))) {
+    vals1 <- metrics_runs %>% filter(Model == pair[1]) %>% pull(!!sym(m))
+    vals2 <- metrics_runs %>% filter(Model == pair[2]) %>% pull(!!sym(m))
+    test <- t.test(vals1, vals2, paired = TRUE)
+    t_results[[length(t_results)+1]] <- tibble(
+      Metric = m,
+      Comparison = paste(pair[1], "vs", pair[2]),
+      p_value = test$p.value
+    )
+  }
+}
+t_results <- bind_rows(t_results)
+
+# ==========================
+# 6. EXPORT RESULTS TO EXCEL
+# ==========================
+addWorksheet(wb, "Metrics_runs")
+writeData(wb, "Metrics_runs", metrics_runs)
+
+addWorksheet(wb, "Meta_Weights")
+writeData(wb, "Meta_Weights", weights_runs)
+
+addWorksheet(wb, "Ttest")
+writeData(wb, "Ttest", t_results)
+
+saveWorkbook(wb, "results_runs.xlsx", overwrite = TRUE)
+cat("✅ Exported all results to results_runs.xlsx\n")
