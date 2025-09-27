@@ -41,7 +41,7 @@ data_clean <- data %>%
     age >= 18, age <= 100,
     bel >= 0, bel <= age - 18,
     bch <= age - 18,
-    api > 0, api <= 150000
+     > 0,  <= 150000
   ) %>%
   mutate(.row = row_number())
 
@@ -141,13 +141,13 @@ for (i in 1:n_runs) {
   # ==========================
   # GAM (bam)
   # ==========================
-vars_gam <- c("lst","age","API","bel","lam","lir","lpi","bch","pho","lin","lgr","pbd")
+vars_gam <- c("lst","age","api","bel","lam","lir","lpi","bch","pho","lin","lgr","pbd")
 
 train_gam <- data_train %>%
   select(all_of(vars_gam)) %>%
   mutate(
     age = as.numeric(age),
-    API = as.numeric(API),
+    api = as.numeric(api),
     bel = as.numeric(bel),
     lam = as.numeric(lam),
     lir = as.numeric(lir),
@@ -164,7 +164,7 @@ test_gam <- data_test %>%
   select(all_of(vars_gam)) %>%
   mutate(
     age = as.numeric(age),
-    API = as.numeric(API),
+    api = as.numeric(api),
     bel = as.numeric(bel),
     lam = as.numeric(lam),
     lir = as.numeric(lir),
@@ -179,7 +179,7 @@ test_gam <- data_test %>%
 
 
 bam_model <- bam(
-  lst_num ~ s(age, k=10) + s(API, k=10) + s(bel, k=10) + s(lam, k=10) +
+  lst_num ~ s(age, k=10) + s(api, k=10) + s(bel, k=10) + s(lam, k=10) +
             s(lir, k=10) + s(lpi, k=10) + s(bch, k=10) +
             pho + lin + lgr + pbd,
   data = train_gam,
