@@ -1,7 +1,5 @@
 # ==============================================================================
-# QUY TRÌNH NGHIÊN CỨU: 10-FOLD CROSS-VALIDATION STACKING (SEQUENTIAL EXECUTION)
-# ĐIỀU CHỈNH: trees=1500 (XGBoost), TREE_DEPTH=6, N_RUNS=30, K=20 (GAM), 
-#             K_FOLDS=10, nfolds(cvfit)=10, penalty GAM=0.02
+
 # ==============================================================================
 
 # ==========================
@@ -79,8 +77,8 @@ calc_metrics <- function(eval_tbl, model_name) {
 # ==========================
 # 4. LOOP MULTIPLE RUNS (SEQUENTIAL)
 # ==========================
-n_runs <- 5   # 👈 N_RUNS = 30
-K_FOLDS <- 5  # 👈 K_FOLDS = 10
+n_runs <- 5   
+K_FOLDS <- 5  
 cat("⏳ Running sequential 10-Fold Stacking for", n_runs, "runs.\n")
 
 # Định nghĩa công thức GAM (K=20)
@@ -199,8 +197,8 @@ for (i in 1:n_runs) {
   
   cvfit <- cv.glmnet(
     x = X_train_s, y = y_train_stack, family = "binomial", alpha = 0.1,
-    penalty.factor = c(1.4, 0.01), # 👈 GAM penalty = 0.02
-    standardize = FALSE, nfolds = 5 # 👈 CV folds = 10
+    penalty.factor = c(1.4, 0.01), 
+    standardize = FALSE, nfolds = 5
   )
   
   stacking_prob_vec <- as.numeric(predict(cvfit, newx = X_test_s, s = "lambda.min", type = "response"))
