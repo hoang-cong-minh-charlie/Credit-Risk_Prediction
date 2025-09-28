@@ -264,6 +264,7 @@ for (i in 1:n_runs) {
 # ==========================
 cat("✅ All runs completed. Summarizing results...\n")
 
+# 5.1. Tóm tắt trung bình các Metrics (Accuracy, AUC,...)
 metrics_summary <- metrics_runs %>%
     group_by(Model) %>%
     summarise(
@@ -271,6 +272,7 @@ metrics_summary <- metrics_runs %>%
         across(Accuracy:Brier, list(Mean = mean, SD = sd), .names = "{.col}_{.fn}")
     )
 
+# 5.2. T-Test so sánh cặp mô hình
 metric_names <- c("Accuracy","Precision","Recall","F1","AUC","Brier")
 t_results <- list()
 
@@ -284,6 +286,31 @@ for (m in metric_names) {
 }
 t_results <- bind_rows(t_results)
 
+# 5.3. BỔ SUNG: Tóm tắt Trung bình & SD của Meta-Weights ⭐️
+weights_summary <- weights_runs %>%
+    group_by(term) %>%
+    summarise(
+        N = n(),
+        Mean_Estimate = mean(estimate, na.rm = TRUE),
+        SD_Estimate = sd(estimate, na.rm = TRUE)
+    ) %>%
+    arrange(desc(abs(Mean_Estimate))) # Sắp xếp theo giá trị tuyệt đối trung bình
+
+cat("✅ Meta-Learner Weights Summary calculated.\n")
+
+# 5.4. BỔ SUNG: Thống kê Mô tả Dữ liệu (Descriptive Stats) ⭐️
+# Thống kê trên tập dữ liệu đã làm sạch (data_clean)
+library(skimr) 
+
+descriptive_stats <- data_clean %>%
+    select(-.row, -lst) %>% # Loại bỏ các cột không cần thiết
+    skim() %>%
+    as_tibble() %>%
+    select(skim_type, skim_variable, n_missing, complete_rate, mean, sd, min, max, everything())
+    
+cat("✅ Descriptive Statistics calculated.\n")
+
+# ==========================
 # ==========================
 # 6. EXPORT RESULTS TO EXCEL
 # ==========================
@@ -293,11 +320,20 @@ writeData(wb, "Metrics_Summary", metrics_summary)
 addWorksheet(wb, "Metrics_Runs_Raw")
 writeData(wb, "Metrics_Runs_Raw", metrics_runs)
 
-addWorksheet(wb, "Meta_Weights")
-writeData(wb, "Meta_Weights", weights_runs)
+addWorksheet(wb, "Meta_Weights_Raw")
+writeData(wb, "Meta_Weights_Raw", weights_runs)
 
 addWorksheet(wb, "Ttest")
 writeData(wb, "Ttest", t_results)
 
-saveWorkbook(wb, "results_runs_optimized_final_class_weights.xlsx", overwrite = TRUE)
-cat("✅ Exported all results to results_runs_optimized_final_class_weights.xlsx\n")
+# BỔ SUNG: Thêm worksheet cho Meta-Weights Summary ⭐️
+addWorksheet(wb, "Meta_Weights_Summary")
+writeData(wb, "Meta_Weights_Summary", weights_summary)
+
+# BỔ SUNG: Thêm worksheet cho Descriptive Stats ⭐️
+addWorksheet(wb, "Descriptive_Stats")
+writeData(wb, "Descriptive_Stats", descriptive_stats)
+
+# Cập nhật tên file để phản ánh kết quả tóm tắt cuối cùng
+saveWorkbook(wb, "results_runs_t1500_k20_n30_final_summary.xlsx", overwrite = TRUE)
+cat("✅ Exported all results to results_runs_t1500_k20_n30_final_summary.xlsx\n")
