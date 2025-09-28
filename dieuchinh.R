@@ -38,7 +38,7 @@ set.seed(123)
 # 2. DATA PREPROCESSING
 # ==========================
 # Lưu ý: Thay "credit_risk_dataset.csv" bằng đường dẫn file thực tế của bạn
-data <- read.csv("credit_risk_dataset.csv", stringsAsFactors = FALSE) %>% clean_names()
+data <- read.csv("data/credit_risk_dataset.csv", stringsAsFactors = FALSE) %>% clean_names()
 
 data_clean <- data %>%
   filter(age >= 18, age <= 100, bel >= 0, bel <= age - 18, bch <= age - 18, api > 0, api <= 150000) %>%
