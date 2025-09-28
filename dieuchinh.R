@@ -199,7 +199,7 @@ for (i in 1:n_runs) {
   
   cvfit <- cv.glmnet(
     x = X_train_s, y = y_train_stack, family = "binomial", alpha = 0.5,
-    penalty.factor = c(1, 0.02), # 👈 GAM penalty = 0.02
+    penalty.factor = c(1, 0.03), # 👈 GAM penalty = 0.02
     standardize = FALSE, nfolds = 10 # 👈 CV folds = 10
   )
   
