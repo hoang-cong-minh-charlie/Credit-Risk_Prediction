@@ -79,8 +79,8 @@ calc_metrics <- function(eval_tbl, model_name) {
 # ==========================
 # 4. LOOP MULTIPLE RUNS (SEQUENTIAL)
 # ==========================
-n_runs <- 30   # 👈 N_RUNS = 30
-K_FOLDS <- 10  # 👈 K_FOLDS = 10
+n_runs <- 5   # 👈 N_RUNS = 30
+K_FOLDS <- 5  # 👈 K_FOLDS = 10
 cat("⏳ Running sequential 10-Fold Stacking for", n_runs, "runs.\n")
 
 # Định nghĩa công thức GAM (K=20)
@@ -134,7 +134,7 @@ for (i in 1:n_runs) {
       recipes::step_zv(recipes::all_predictors()) %>%
       recipes::step_normalize(recipes::all_numeric_predictors())
     
-    xgb_spec <- parsnip::boost_tree(trees = 1500, tree_depth = 6, learn_rate = 0.1) %>% 
+    xgb_spec <- parsnip::boost_tree(trees = 500, tree_depth = 6, learn_rate = 0.1) %>% 
       parsnip::set_engine("xgboost", scale_pos_weight = scale_pos_weight_value) %>% 
       parsnip::set_mode("classification")
     
@@ -198,9 +198,9 @@ for (i in 1:n_runs) {
   X_test_s <- scale(X_test_stack, center = attr(X_train_s, "scaled:center"), scale = attr(X_train_s, "scaled:scale"))
   
   cvfit <- cv.glmnet(
-    x = X_train_s, y = y_train_stack, family = "binomial", alpha = 0.5,
-    penalty.factor = c(1, 0.03), # 👈 GAM penalty = 0.02
-    standardize = FALSE, nfolds = 10 # 👈 CV folds = 10
+    x = X_train_s, y = y_train_stack, family = "binomial", alpha = 0.1,
+    penalty.factor = c(1.4, 0.01), # 👈 GAM penalty = 0.02
+    standardize = FALSE, nfolds = 5 # 👈 CV folds = 10
   )
   
   stacking_prob_vec <- as.numeric(predict(cvfit, newx = X_test_s, s = "lambda.min", type = "response"))
