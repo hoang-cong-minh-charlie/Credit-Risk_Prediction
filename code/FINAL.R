@@ -90,8 +90,8 @@ n_runs <- 30
 K_FOLDS <- 10  
 
 # Define the GAM formula (used in the loop)
-gam_formula <- lst_num ~ s(age, k=20) + s(api, k=20) + s(bel, k=20) + s(lam, k=20) + 
-                        s(lir, k=20) + s(lpi, k=20) + s(bch, k=20) +
+gam_formula <- lst_num ~ s(age, k=30) + s(api, k=30) + s(bel, k=30) + s(lam, k=30) + 
+                        s(lir, k=30) + s(lpi, k=30) + s(bch, k=30) +
                         pho + lin + lgr + pbd + lgr:pbd + api:lir + age:bch 
 
 # CALCULATE SCALE POS WEIGHT FOR XGBOOST
