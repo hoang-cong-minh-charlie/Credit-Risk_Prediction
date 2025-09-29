@@ -269,13 +269,10 @@ weights_summary <- weights_runs %>%
 #  Descriptive Stats 
 # ----------------------------------------------------------------------
 
-# Tạo một bản sao dữ liệu TẠM THỜI để chuyển đổi lst thành numeric cho thống kê mô tả
 data_stats <- data_clean %>%
     mutate(lst_num = as.numeric(as.character(lst))) 
 
-
 #  Numeric Variables Summary 
-# Chọn tất cả biến số, loại bỏ .row và lst (vì ta dùng lst_num)
 numeric_vars_list <- data_stats %>% 
     select(where(is.numeric), -c(.row)) %>% 
     names()
