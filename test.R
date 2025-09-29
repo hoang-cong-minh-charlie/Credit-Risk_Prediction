@@ -1,47 +1,51 @@
-# ==============================================================================
-# STACKING XGBOOST + GAM (GAM SỬ DỤNG TRỌNG SỐ LỚP)
-# Đã FIX lỗi ký tự ẩn và tích hợp Class Weights cho GAM.
-# ==============================================================================
 
 # ==========================
-# 1. INSTALL & LOAD LIBRARIES
+# 0. INSTALL & LOAD LIBRARIES
 # ==========================
 install_if_missing <- function(pkg){
     if (!requireNamespace(pkg, quietly = TRUE)) {
         install.packages(pkg, dependencies = TRUE)
     }
-    # Đảm bảo không có ký tự ẩn ở cuối dòng
     require(pkg, character.only = TRUE) 
 }
 
-packages <- c(
-    "tidymodels", "janitor", "skimr", "mgcv", "ggplot2", "dplyr", "tibble", 
-    "tidyr", "pROC", "openxlsx", "themis", "broom", "glmnet", "Matrix",
-    "rsample", "yardstick", "purrr", "recipes" # Thêm recipes nếu chưa có
+# List of required packages
+packages_minimal <- c(
+    "dplyr",      
+    "rsample",    
+    "yardstick",  
+    "glmnet",     
+    "mgcv",       
+    "janitor",    
+    "purrr",     
+    "recipes",    
+    "parsnip",   
+    "workflows",  
+    "openxlsx",   
+    "skimr",      
+    "RANN"        
 )
-invisible(lapply(packages, install_if_missing))
 
-# Tải các thư viện cốt lõi
+# Declare libraries
 library(dplyr)
 library(rsample)
 library(yardstick)
 library(glmnet)
 library(mgcv)
-library(themis)
 library(openxlsx)
 library(janitor)
 library(purrr)
-library(recipes) # Cần thiết cho các bước step_
-library(RANN) # Nếu bạn sử dụng SMOTE/NN Imputation cho các mô hình khác (dù đã loại bỏ cho GAM)
-
+library(recipes)
+library(RANN)
+library(skimr) 
+library(parsnip)
+library(workflows)
 
 set.seed(123)
 
 # ==========================
-# 2. DATA PREPROCESSING
+# 1. DATA PREPROCESSING
 # ==========================
-# Lưu ý: Thay "data/credit_risk_dataset.csv" bằng đường dẫn file thực tế của bạn
-# (Giả định file nằm trong thư mục con 'data' hoặc bạn sửa đường dẫn)
 data <- read.csv("data/credit_risk_dataset.csv", stringsAsFactors = FALSE) %>% clean_names()
 
 data_clean <- data %>%
@@ -58,11 +62,8 @@ data_clean <- data_clean %>%
            across(c(pho, lin, lgr, pbd), as.factor), 
            lst = factor(lst, levels = c("0", "1"))) 
 
-wb <- createWorkbook()
-cat("✅ Data Cleaning complete\n")
-
 # ==========================
-# 3. FUNCTION: CALCULATE METRICS
+# FUNCTION: CALCULATE METRICS
 # ==========================
 calc_metrics <- function(eval_tbl, model_name) {
     eval_tbl_clean <- eval_tbl %>%
@@ -314,6 +315,7 @@ cat("✅ Descriptive Statistics calculated.\n")
 # ==========================
 # 6. EXPORT RESULTS TO EXCEL
 # ==========================
+wb <- createWorkbook()
 addWorksheet(wb, "Metrics_Summary")
 writeData(wb, "Metrics_Summary", metrics_summary)
 
