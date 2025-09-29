@@ -1,5 +1,5 @@
 # ==========================
-# 1. INSTALL & LOAD LIBRARIES 
+# INSTALL & LOAD LIBRARIES 
 # ==========================
 install_if_missing <- function(pkg){
     if (!requireNamespace(pkg, quietly = TRUE)) {
