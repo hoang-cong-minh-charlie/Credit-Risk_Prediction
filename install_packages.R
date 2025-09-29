@@ -48,4 +48,4 @@ library(workflows)
 
 set.seed(123)
 
-# ... (Phần còn lại của code từ Mục 2 đến Mục 6 được giữ nguyên)
+
