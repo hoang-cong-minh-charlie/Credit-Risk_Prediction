@@ -9,42 +9,16 @@ install_if_missing <- function(pkg){
     require(pkg, character.only = TRUE) 
 }
 
-# List of required packages
+# list of required packages
 packages_minimal <- c(
-    "dplyr",      
-    "rsample",    
-    "yardstick",  
-    "glmnet",     
-    "mgcv",       
-    "janitor",    
-    "purrr",     
-    "recipes",    
-    "parsnip",   
-    "workflows",  
-    "openxlsx",   
-    "skimr",      
-    "RANN"        
+    "dplyr", "rsample", "yardstick", "glmnet", "mgcv", "janitor", 
+    "purrr", "recipes", "parsnip", "workflows", "openxlsx", "skimr", "RANN"
 )
-
-# Declare libraries
-library(dplyr)
-library(rsample)
-library(yardstick)
-library(glmnet)
-library(mgcv)
-library(openxlsx)
-library(janitor)
-library(purrr)
-library(recipes)
-library(RANN)
-library(skimr) 
-library(parsnip)
-library(workflows)
 
 set.seed(123)
 
 # ==========================
-# 1. DATA PREPROCESSING
+# DATA PREPROCESSING
 # ==========================
 data <- read.csv("data/credit_risk_dataset.csv", stringsAsFactors = FALSE) %>% clean_names()
 
@@ -84,24 +58,26 @@ calc_metrics <- function(eval_tbl, model_name) {
 }
 
 # ==========================
-# 4. LOOP MULTIPLE RUNS (SEQUENTIAL)
+# LOOP MULTIPLE RUNS (SEQUENTIAL)
 # ==========================
 n_runs <- 30    
 K_FOLDS <- 10  
 cat("⏳ Running sequential Stacking for", n_runs, "runs (GAM with Class Weights).\n")
 
-# Định nghĩa công thức GAM 
-gam_formula <- lst_num ~ s(age, k=30) + s(api, k=30) + s(bel, k=30) + s(lam, k=30) + 
-                        s(lir, k=30) + s(lpi, k=30) + s(bch, k=30) +
+# Define the GAM formula (used in the loop) 
+gam_formula <- lst_num ~ s(age, k=20) + s(api, k=20) + s(bel, k=20) + s(lam, k=20) + 
+                        s(lir, k=20) + s(lpi, k=20) + s(bch, k=20) +
                         pho + lin + lgr + pbd + lgr:pbd + api:lir + age:bch 
 
-# TÍNH SCALE POS WEIGHT CHO XGBOOST (Dùng trên toàn bộ tập dữ liệu)
+# CALCULATE SCALE POS WEIGHT FOR XGBOOST
 pos_count <- sum(data_clean$lst == "1")
 neg_count <- sum(data_clean$lst == "0")
 scale_pos_weight_value <- neg_count / pos_count
 
+#Initialize result tibbles
 metrics_runs <- tibble()
 weights_runs <- tibble()
+
 
 for (i in 1:n_runs) {
     cat(sprintf("    -> Running iteration %d/%d...\n", i, n_runs))
@@ -113,10 +89,10 @@ for (i in 1:n_runs) {
     data_train_full <- training(data_split) %>% select(-.row)
     data_test <- testing(data_split) %>% select(-.row)
     
-    # CHIA data_train_full THÀNH K_FOLDS
+    # SPLIT data_train_full INTO K_FOLDS
     data_folds <- vfold_cv(data_train_full, v = K_FOLDS, strata = lst)
     
-    # Chuẩn bị OOF Prediction vectors
+    # Prepare OOF Prediction vectors
     oof_predictions <- data_train_full %>% 
         select(lst) %>% 
         mutate(xgb_oof = NA_real_, gam_oof = NA_real_)
@@ -130,11 +106,11 @@ for (i in 1:n_runs) {
         data_train_k <- training(fold_data)
         data_validation_k <- testing(fold_data) 
         
-        # LẤY CHỈ MỤC HÀNG OOF
+        # GET ROW INDEX OOF
         all_indices <- 1:nrow(data_train_full)
         validation_indices <- all_indices[!(all_indices %in% fold_data$in_id)]
         
-        # 1. XGBOOST K-FOLD Training (Sử dụng scale_pos_weight)
+        # 1. XGBOOST K-FOLD Training 
         xgb_rec <- recipes::recipe(lst ~ ., data = data_train_k) %>% 
             recipes::step_other(recipes::all_nominal_predictors(), threshold = 0.01, other = "other_cat") %>%
             recipes::step_dummy(recipes::all_nominal_predictors()) %>%
@@ -148,20 +124,16 @@ for (i in 1:n_runs) {
         xgb_wf <- workflows::workflow() %>% workflows::add_model(xgb_spec) %>% workflows::add_recipe(xgb_rec)
         xgb_model_k <- parsnip::fit(xgb_wf, data = data_train_k)
         
-        # 2. GAM K-FOLD Training (SỬ DỤNG TRỌNG SỐ LỚP)
+        # 2. GAM K-FOLD Training 
         vars_gam <- all.vars(gam_formula)
         train_gam_k <- data_train_k %>% 
             mutate(lst_num = as.numeric(as.character(lst))) %>% 
-            select(all_of(vars_gam), lst) # Thêm lst để tính trọng số
+            select(all_of(vars_gam), lst) 
         
-        # === TÍNH TOÁN VÀ ÁP DỤNG TRỌNG SỐ LỚP CHO GAM ===
+        # BALANCE THE CLASS
         class_counts <- table(train_gam_k$lst)
-        # Trọng số tỷ lệ nghịch với tần suất: N_total / (N_classes * N_class_i)
         weights_vector <- sum(class_counts) / (length(class_counts) * class_counts)
-
-        # Lấy trọng số cho từng hàng
         sample_weights_k <- weights_vector[as.character(train_gam_k$lst)]
-        # ==================================================
         
         bam_model_k <- bam(
             gam_formula, data = train_gam_k, family = binomial(), method = "fREML", discrete = TRUE, select = TRUE,
@@ -172,7 +144,7 @@ for (i in 1:n_runs) {
         xgb_oof_prob <- predict(xgb_model_k, new_data = data_validation_k, type = "prob")$.pred_1
         oof_predictions[validation_indices, "xgb_oof"] <- xgb_oof_prob 
         
-        # Validation data cho GAM
+        # Validation data GAM
         val_gam_k <- data_validation_k %>% mutate(lst_num = as.numeric(as.character(lst))) %>% select(all_of(vars_gam))
         gam_oof_prob <- as.numeric(predict(bam_model_k, newdata = val_gam_k, type = "response"))
         oof_predictions[validation_indices, "gam_oof"] <- gam_oof_prob
@@ -194,13 +166,12 @@ for (i in 1:n_runs) {
         )
     xgb_model_final <- parsnip::fit(xgb_wf_final, data = data_train_full)
     
-    # 2. GAM FINAL (SỬ DỤNG TRỌNG SỐ LỚP)
+    # 2. GAM FINAL 
     vars_gam <- all.vars(gam_formula)
     train_gam_final <- data_train_full %>% 
         mutate(lst_num = as.numeric(as.character(lst))) %>% 
-        select(all_of(vars_gam), lst) # Thêm lst để tính trọng số
+        select(all_of(vars_gam), lst) 
 
-    # === TÍNH TOÁN VÀ ÁP DỤNG TRỌNG SỐ LỚP CHO GAM FINAL ===
     class_counts_final <- table(train_gam_final$lst)
     weights_vector_final <- sum(class_counts_final) / (length(class_counts_final) * class_counts_final)
     sample_weights_final <- weights_vector_final[as.character(train_gam_final$lst)]
@@ -208,7 +179,7 @@ for (i in 1:n_runs) {
     
     bam_model_final <- bam(
         gam_formula, data = train_gam_final, family = binomial(), method = "fREML", discrete = TRUE, select = TRUE,
-        weights = sample_weights_final # <-- ÁP DỤNG TRỌNG SỐ
+        weights = sample_weights_final 
     )
     
     # --------------------------------------------------
@@ -219,13 +190,13 @@ for (i in 1:n_runs) {
     
     xgb_prob_vec_test <- predict(xgb_model_final, new_data = data_test, type = "prob")$.pred_1
     
-    # Test data cho GAM
+    # Test data GAM
     test_gam_final_data <- data_test %>% mutate(lst_num = as.numeric(as.character(lst))) %>% select(all_of(vars_gam))
     gam_prob_vec_test <- as.numeric(predict(bam_model_final, newdata = test_gam_final_data, type = "response"))
     
     X_test_stack <- cbind(xgb = xgb_prob_vec_test, gam = gam_prob_vec_test)
     
-    # Chuẩn hóa
+    # Standardization
     X_train_s <- scale(X_train_stack)
     X_test_s <- scale(X_test_stack, center = attr(X_train_s, "scaled:center"), scale = attr(X_train_s, "scaled:scale"))
     
@@ -260,20 +231,59 @@ for (i in 1:n_runs) {
     weights_runs <- bind_rows(weights_runs, coef_df)
 }
 
-# ==========================
-# 5. SUMMARY & T-TEST
-# ==========================
-cat("✅ All runs completed. Summarizing results...\n")
+# ==============================================================================
+# SUMMARY AND REPORTING
+# ==============================================================================
 
-# 5.1. Tóm tắt trung bình các Metrics (Accuracy, AUC,...)
-metrics_summary <- metrics_runs %>%
-    group_by(Model) %>%
+# 1. Function for Numeric Summary
+summ_numeric <- function(x) {
+  c(
+    count = sum(!is.na(x)),
+    mean = mean(x, na.rm = TRUE),
+    sd = sd(x, na.rm = TRUE),
+    min = min(x, na.rm = TRUE),
+    q1 = quantile(x, 0.25, na.rm = TRUE),
+    median = median(x, na.rm = TRUE),
+    q3 = quantile(x, 0.75, na.rm = TRUE),
+    max = max(x, na.rm = TRUE)
+  )
+}
+
+# 2. Function for Factor Summary
+summ_factor <- function(df, var) {
+  var_sym <- sym(var)
+  
+  summary_tbl <- df %>%
+    filter(!is.na(!!var_sym)) %>%
+    group_by(!!var_sym) %>%
+    summarise(Count = n(), .groups = 'drop') %>%
+    mutate(
+      Total_Valid_N = sum(Count),
+      Percentage = (Count / Total_Valid_N) * 100
+    ) %>%
+    rename(Level = !!var_sym) %>%
+    mutate(
+      Variable = var,
+      Type = "Factor"
+    ) %>%
+    select(Variable, Type, Level, Count, Percentage, Total_Valid_N)
+    
+  return(summary_tbl)
+}
+
+# ----------------------------------------------------------------------
+#  Average Summary of Metrics
+# ----------------------------------------------------------------------
+metrics_summary <- metrics_runs %>% 
+    group_by(Model) %>% 
     summarise(
-        N = n(),
+        N = n(), 
         across(Accuracy:Brier, list(Mean = mean, SD = sd), .names = "{.col}_{.fn}")
     )
 
-# 5.2. T-Test so sánh cặp mô hình
+# ----------------------------------------------------------------------
+#  Paired T-Test Comparison (Stacking vs Base)
+# ----------------------------------------------------------------------
 metric_names <- c("Accuracy","Precision","Recall","F1","AUC","Brier")
 t_results <- list()
 
@@ -287,55 +297,76 @@ for (m in metric_names) {
 }
 t_results <- bind_rows(t_results)
 
-# 5.3. BỔ SUNG: Tóm tắt Trung bình & SD của Meta-Weights ⭐️
-weights_summary <- weights_runs %>%
-    group_by(term) %>%
+# ----------------------------------------------------------------------
+#  Summary of Mean and SD of Meta-Weights
+# ----------------------------------------------------------------------
+weights_summary <- weights_runs %>% 
+    group_by(term) %>% 
     summarise(
-        N = n(),
-        Mean_Estimate = mean(estimate, na.rm = TRUE),
+        N = n(), 
+        Mean_Estimate = mean(estimate, na.rm = TRUE), 
         SD_Estimate = sd(estimate, na.rm = TRUE)
-    ) %>%
-    arrange(desc(abs(Mean_Estimate))) # Sắp xếp theo giá trị tuyệt đối trung bình
+    ) %>% 
+    arrange(desc(abs(Mean_Estimate)))
 
-cat("✅ Meta-Learner Weights Summary calculated.\n")
+# ----------------------------------------------------------------------
+#  Descriptive Stats 
+# ----------------------------------------------------------------------
 
-# 5.4. BỔ SUNG: Thống kê Mô tả Dữ liệu (Descriptive Stats) ⭐️
-# Thống kê trên tập dữ liệu đã làm sạch (data_clean)
-library(skimr) 
+data_stats <- data_clean %>%
+    mutate(lst_num = as.numeric(as.character(lst))) 
 
-descriptive_stats <- data_clean %>%
-    select(-.row, -lst) %>% # Loại bỏ các cột không cần thiết
-    skim() %>%
-    as_tibble() %>%
-    select(skim_type, skim_variable, n_missing, complete_rate, mean, sd, min, max, everything())
-    
-cat("✅ Descriptive Statistics calculated.\n")
+#  Numeric Variables Summary 
+numeric_vars_list <- data_stats %>% 
+    select(where(is.numeric), -c(.row)) %>% 
+    names()
 
-# ==========================
-# ==========================
-# 6. EXPORT RESULTS TO EXCEL
-# ==========================
-wb <- createWorkbook()
+numeric_descriptive_stats <- data_stats %>%
+    select(all_of(numeric_vars_list)) %>%
+    purrr::map(summ_numeric) %>% # Use map() to get a list of named vectors
+    tibble::enframe(name = "Variable", value = "Stats") %>%
+    tidyr::unnest_wider(Stats) %>% 
+    mutate(Type = "Numeric") %>%
+    # Đổi tên lst_num lại thành lst trong bảng kết quả
+    mutate(Variable = ifelse(Variable == "lst_num", "lst", Variable)) %>% 
+    select(Variable, Type, everything())
+
+
+#  Factor Variables Summary 
+factor_vars_list <- data_clean %>% 
+    select(where(is.factor), -lst, -c(.row)) %>% 
+    names()
+
+factor_stats_list <- purrr::map(factor_vars_list, ~ summ_factor(data_clean, .x))
+factor_descriptive_stats <- bind_rows(factor_stats_list)
+
+wb <- createWorkbook() 
+
+# Add Metric Sheets
 addWorksheet(wb, "Metrics_Summary")
 writeData(wb, "Metrics_Summary", metrics_summary)
 
 addWorksheet(wb, "Metrics_Runs_Raw")
 writeData(wb, "Metrics_Runs_Raw", metrics_runs)
 
+# Add Meta-Weights Sheets
 addWorksheet(wb, "Meta_Weights_Raw")
 writeData(wb, "Meta_Weights_Raw", weights_runs)
 
-addWorksheet(wb, "Ttest")
-writeData(wb, "Ttest", t_results)
-
-# BỔ SUNG: Thêm worksheet cho Meta-Weights Summary ⭐️
 addWorksheet(wb, "Meta_Weights_Summary")
 writeData(wb, "Meta_Weights_Summary", weights_summary)
 
-# BỔ SUNG: Thêm worksheet cho Descriptive Stats ⭐️
-addWorksheet(wb, "Descriptive_Stats")
-writeData(wb, "Descriptive_Stats", descriptive_stats)
+# Add T-Test Sheet
+addWorksheet(wb, "Ttest")
+writeData(wb, "Ttest", t_results)
 
-# Cập nhật tên file để phản ánh kết quả tóm tắt cuối cùng
-saveWorkbook(wb, "results_runs_t1500_k20_n30_final_summary.xlsx", overwrite = TRUE)
-cat("✅ Exported all results to results_runs_t1500_k20_n30_final_summary.xlsx\n")
+# Add Descriptive Stats Sheets
+addWorksheet(wb, "Numeric_Stats")
+writeData(wb, "Numeric_Stats", numeric_descriptive_stats)
+
+addWorksheet(wb, "Factor_Stats")
+writeData(wb, "Factor_Stats", factor_descriptive_stats)
+
+# Save the workbook and print final confirmation
+saveWorkbook(wb, "results.xlsx", overwrite = TRUE)
+cat("✅ Exported all results to results.xlsx\n")
