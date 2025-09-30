@@ -12,7 +12,7 @@ install_if_missing <- function(pkg){
 # list of required packages
 packages_minimal <- c(
     "dplyr", "rsample", "yardstick", "glmnet", "mgcv", "janitor", 
-    "purrr", "recipes", "parsnip", "workflows", "openxlsx", "skimr", "RANN"
+    "purrr", "recipes", "parsnip", "workflows", "openxlsx", "skimr"
 )
 
 library(dplyr)
@@ -22,12 +22,11 @@ library(glmnet)
 library(mgcv)
 library(janitor)
 library(purrr)
-library(repcipes)
+library(recipes)
 library(parship)
 library(workflows)
 library(openxlsx)
 library(skimr)
-library(RANN)
 
 set.seed(123)
 
