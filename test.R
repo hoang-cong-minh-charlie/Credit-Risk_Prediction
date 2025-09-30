@@ -15,6 +15,20 @@ packages_minimal <- c(
     "purrr", "recipes", "parsnip", "workflows", "openxlsx", "skimr", "RANN"
 )
 
+library(dplyr)
+library(rsample)
+library(yardstick)
+library(glmnet)
+library(mgcv)
+library(janitor)
+library(purrr)
+library(repcipes)
+library(parship)
+library(workflows)
+library(openxlsx)
+library(skimr)
+library(RANN)
+
 set.seed(123)
 
 # ==========================
@@ -23,7 +37,7 @@ set.seed(123)
 data <- read.csv("data/credit_risk_dataset.csv", stringsAsFactors = FALSE) %>% clean_names()
 
 data_clean <- data %>%
-    filter(age >= 18, age <= 100, bel >= 0, bel <= age - 18, bch <= age - 18, api > 0, api <= 150000) %>%
+    filter(age >= 18, age <= 100, bel >= 0, bel <= age - 18, bch <= age - 18, api > 0, api <= 150) %>%
     mutate(.row = row_number())
 
 num_vars <- data_clean %>% select(where(is.numeric))
